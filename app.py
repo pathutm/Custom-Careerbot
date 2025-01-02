@@ -2,7 +2,6 @@
 import os
 import streamlit as st
 import google.generativeai as genai
-from streamlit_chat import message
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -10,8 +9,12 @@ load_dotenv()
 
 # Configure Gemini API
 api_key = os.getenv("GEMINI_API_KEY")
+# For Streamlit Cloud deployment, use st.secrets
+if not api_key and "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+
 if not api_key:
-    st.error("Please set your GEMINI_API_KEY in the .env file")
+    st.error("Please set your GEMINI_API_KEY in the .env file or Streamlit secrets")
     st.stop()
 
 genai.configure(api_key=api_key)
@@ -30,18 +33,21 @@ st.markdown("""
         max-width: 1200px;
         margin: 0 auto;
     }
-    .css-1d391kg {
-        padding: 2rem 1rem;
-    }
-    .chat-message {
-        padding: 1.5rem;
+    .user-message {
+        background-color: #e6f3ff;
+        padding: 1rem;
         border-radius: 0.5rem;
-        margin-bottom: 1rem;
-        display: flex;
-        flex-direction: column;
+        margin: 1rem 0;
+        align-self: flex-end;
+        max-width: 80%;
     }
-    .css-1p05t8e {
+    .assistant-message {
+        background-color: #f0f2f6;
+        padding: 1rem;
         border-radius: 0.5rem;
+        margin: 1rem 0;
+        align-self: flex-start;
+        max-width: 80%;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -197,6 +203,11 @@ def get_response(user_input):
     except Exception as e:
         return f"An error occurred: {str(e)}"
 
+def display_message(message, is_user=False):
+    """Display a chat message"""
+    class_name = "user-message" if is_user else "assistant-message"
+    st.markdown(f'<div class="{class_name}">{message}</div>', unsafe_allow_html=True)
+
 # Main UI
 def main():
     init_session_state()
@@ -220,7 +231,7 @@ def main():
         if st.button("Clear Chat History", type="secondary"):
             st.session_state.chat_history = []
             st.session_state.chat_session = st.session_state.model.start_chat(history=[])
-            st.rerun()  # Updated from experimental_rerun()
+            st.rerun()
     
     # Chat container
     chat_container = st.container()
@@ -228,10 +239,7 @@ def main():
     # Display chat history
     with chat_container:
         for i, chat in enumerate(st.session_state.chat_history):
-            if i % 2 == 0:  # User message
-                message(chat, is_user=True, key=f"user_{i}")
-            else:  # Assistant message
-                message(chat, key=f"assistant_{i}")
+            display_message(chat, is_user=(i % 2 == 0))
     
     # User input
     user_input = st.chat_input("Type your message here...")
@@ -248,7 +256,7 @@ def main():
         st.session_state.chat_history.append(bot_response)
         
         # Rerun the app to display new messages
-        st.rerun()  # Updated from experimental_rerun()
+        st.rerun()
 
 if __name__ == "__main__":
     main()
